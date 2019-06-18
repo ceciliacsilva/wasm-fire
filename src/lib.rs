@@ -8,6 +8,9 @@ use web_sys::{WebGlProgram, WebGlRenderingContext, WebGlShader};
 
 use rand::prelude::*;
 
+mod utils;
+use utils::{Timer, request_animation_frame};
+
 #[wasm_bindgen]
 extern {
     pub fn alert(s: &str);
@@ -71,6 +74,8 @@ pub fn start() -> Result<(), JsValue> {
     context.vertex_attrib_pointer_with_i32(0, 3, WebGlRenderingContext::FLOAT, false, 0, 0);
     context.enable_vertex_attrib_array(0);
 
+    let _timer = Timer::new("animate");
+
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
@@ -86,7 +91,6 @@ pub fn start() -> Result<(), JsValue> {
 fn animate(
     context: &WebGlRenderingContext,
 ) -> Result<(), JsValue> {
-    web_sys::console::time_with_label("some operation");
 
     let mut rng = rand::thread_rng();
     let size: f32 = rng.gen();
@@ -118,29 +122,8 @@ fn animate(
         3
     );
 
-    web_sys::console::time_end_with_label("some operation");
-
     Ok(())
 }
-
-fn now() -> f64 {
-    web_sys::window()
-        .expect("should have a Window")
-        .performance()
-        .expect("should have a Performance")
-        .now()
-}
-
-fn window() -> web_sys::Window {
-    web_sys::window().expect("no global `window` exists")
-}
-
-fn request_animation_frame(f: &Closure<FnMut(f32)>) {
-    window()
-        .request_animation_frame(f.as_ref().unchecked_ref())
-        .expect("should register `requestAnimationFrame` Ok");
-}
-
 
 pub fn compile_shader(
     context: &WebGlRenderingContext,

@@ -1,0 +1,29 @@
+[package]
+name = "wasm-webgl"
+version = "0.1.0"
+authors = ["Cecilia Carneiro <cecilia.carneiroesilva@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2.46"
+js-sys = "0.3.23"
+rand = { version = "0.6.5", features = ["wasm-bindgen"] }
+
+[dependencies.web-sys]
+version = "0.3.4"
+features = [
+  'Document',
+  'Element',
+  'HtmlCanvasElement',
+  'WebGlBuffer',
+  'WebGlRenderingContext',
+  'WebGlProgram',
+  'WebGlShader',
+  'Window',
+  'console',
+  'Performance',
+]

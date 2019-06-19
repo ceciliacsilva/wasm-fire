@@ -11,7 +11,19 @@ crate-type = ["cdylib"]
 [dependencies]
 wasm-bindgen = "0.2.46"
 js-sys = "0.3.23"
-rand = { version = "0.6.5", features = ["wasm-bindgen"] }
+cfg-if = "0.1.2"
+
+[dependencies.rand]
+version = "0.6.5"
+features = ["wasm-bindgen"]
+
+# This crate provides better debugging of panic by logging
+# them with `console.error`. This is great for development,
+# but require all the `std::fmt` and `std::panicking` infrastructure,
+# so isn't great for code size when deploying.
+[dependencies.console_error_panic_hook]
+version = "0.1.1"
+optional = true
 
 [dependencies.web-sys]
 version = "0.3.4"

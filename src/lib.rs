@@ -4,12 +4,12 @@ use std::rc::Rc;
 use js_sys::WebAssembly;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{WebGlProgram, WebGlRenderingContext, WebGlShader};
+use web_sys::{WebGlRenderingContext};
 
 use rand::prelude::*;
 
 mod utils;
-use utils::{Timer, request_animation_frame};
+use utils::{Timer, request_animation_frame, compile_shader, link_program};
 
 #[wasm_bindgen]
 extern {
@@ -19,6 +19,174 @@ extern {
 #[wasm_bindgen]
 pub fn say_hi(){
     alert("Hello.");
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Cell {
+    Dead,
+    Burning,
+    Alive,
+}
+
+impl Cell {
+    fn live_to_burn(&mut self) {
+        if let Cell::Alive = *self {
+            *self = Cell::Burning
+        };
+    }
+
+    fn is_burning(&self) -> u8 {
+        match *self {
+            Cell::Dead => 0,
+            Cell::Burning => 1,
+            Cell::Alive => 0,
+        }
+    }
+}
+
+struct Universe {
+    width: u32,
+    height: u32,
+    cells: Vec<Cell>,
+    time_cells: Vec<u8>,
+    game_configs: GameConfig,
+}
+
+struct GameConfig {
+    to_burn: f32,
+    time_to_burn: u8,
+    num_focus: u8,
+}
+
+impl Universe {
+    fn get_index(&self, row: u32, column: u32) -> usize {
+        (row * self.width + column) as usize
+    }
+
+    fn burning_neighbor_count(&self, row: u32, column: u32) -> u8 {
+        let mut count = 0;
+
+        let north = if row == 0 {
+            self.height - 1
+        } else {
+            row - 1
+        };
+
+        let south = if row == self.height - 1 {
+            0
+        } else {
+            row + 1
+        };
+
+        let west = if column == 0 {
+            self.width - 1
+        } else {
+            column - 1
+        };
+
+        let east = if column == self.width - 1 {
+            0
+        } else {
+            column + 1
+        };
+
+        let nw = self.get_index(north, west);
+        count += self.cells[nw] as u8;
+
+        let n = self.get_index(north, column);
+        count += self.cells[n] as u8;
+
+        let ne = self.get_index(north, east);
+        count += self.cells[ne] as u8;
+
+        let w = self.get_index(row, west);
+        count += self.cells[w] as u8;
+
+        let e = self.get_index(row, east);
+        count += self.cells[e] as u8;
+
+        let sw = self.get_index(south, west);
+        count += self.cells[sw] as u8;
+
+        let s = self.get_index(south, column);
+        count += self.cells[s] as u8;
+
+        let se = self.get_index(south, east);
+        count += self.cells[se] as u8;
+
+        count
+    }
+}
+
+impl Universe {
+    fn tick (&mut self) {
+        let mut next = self.cells.clone();
+
+        for row in 0..self.height {
+            for col in 0..self.width {
+                let idx = self.get_index(row, col);
+                let cell = self.cells[idx];
+
+                if cell == Cell::Alive {
+                    let burning_neighbor = self.burning_neighbor_count(row, col);
+
+                    if burning_neighbor > 0 {
+                        let mut rng = rand::thread_rng();
+                        let prob_burn: f32 = rng.gen();
+
+                        if prob_burn < self.game_configs.to_burn {
+                            next[idx].live_to_burn();
+                        }
+                    }
+                }
+
+                if cell == Cell::Burning {
+                    self.time_cells[idx] += 1;
+                }
+            }
+        }
+
+        self.cells = next;
+    }
+
+    fn new() -> Universe {
+        utils::set_panic_hook();
+
+        let width = 128;
+        let height = 128;
+        let num_focus = 3;
+        let mut rng = rand::thread_rng();
+        let mut pos = Vec::new();
+
+        for _i in 0..num_focus {
+            let n: u32 = rng.gen_range(0, width * height);
+            pos.push(n);
+        }
+
+        let cells = (0..width * height)
+            .map(|i| {
+                if pos.contains(&i) {
+                    Cell::Burning
+                } else {
+                    Cell::Alive
+                }
+            })
+            .collect();
+
+        let game_configs = GameConfig {
+            to_burn: 0.7,
+            time_to_burn: 10,
+            num_focus,
+        };
+
+        Universe {
+            width,
+            height,
+            cells,
+            time_cells: Vec::new(),
+            game_configs,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -125,52 +293,3 @@ fn animate(
     Ok(())
 }
 
-pub fn compile_shader(
-    context: &WebGlRenderingContext,
-    shader_type: u32,
-    source: &str,
-) -> Result<WebGlShader, String> {
-    let shader = context
-        .create_shader(shader_type)
-        .ok_or_else(|| String::from("Unable to create shader object"))?;
-    context.shader_source(&shader, source);
-    context.compile_shader(&shader);
-
-    if context
-        .get_shader_parameter(&shader, WebGlRenderingContext::COMPILE_STATUS)
-        .as_bool()
-        .unwrap_or(false)
-    {
-        Ok(shader)
-    } else {
-        Err(context
-            .get_shader_info_log(&shader)
-            .unwrap_or_else(|| String::from("Unknown error creating shader")))
-    }
-}
-
-pub fn link_program(
-    context: &WebGlRenderingContext,
-    vert_shader: &WebGlShader,
-    frag_shader: &WebGlShader,
-) -> Result<WebGlProgram, String> {
-    let program = context
-        .create_program()
-        .ok_or_else(|| String::from("Unable to create shader object"))?;
-
-    context.attach_shader(&program, vert_shader);
-    context.attach_shader(&program, frag_shader);
-    context.link_program(&program);
-
-    if context
-        .get_program_parameter(&program, WebGlRenderingContext::LINK_STATUS)
-        .as_bool()
-        .unwrap_or(false)
-    {
-        Ok(program)
-    } else {
-        Err(context
-            .get_program_info_log(&program)
-            .unwrap_or_else(|| String::from("Unknown error creating program object")))
-    }
-}

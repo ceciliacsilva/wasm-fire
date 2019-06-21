@@ -44,6 +44,7 @@ impl Cell {
     }
 }
 
+#[derive(Clone)]
 struct Universe {
     width: u32,
     height: u32,
@@ -52,6 +53,7 @@ struct Universe {
     game_configs: GameConfig,
 }
 
+#[derive(Clone)]
 struct GameConfig {
     to_burn: f32,
     time_to_burn: u8,
@@ -91,28 +93,28 @@ impl Universe {
         };
 
         let nw = self.get_index(north, west);
-        count += self.cells[nw] as u8;
+        count += self.cells[nw].is_burning() as u8;
 
         let n = self.get_index(north, column);
-        count += self.cells[n] as u8;
+        count += self.cells[n].is_burning() as u8;
 
         let ne = self.get_index(north, east);
-        count += self.cells[ne] as u8;
+        count += self.cells[ne].is_burning() as u8;
 
         let w = self.get_index(row, west);
-        count += self.cells[w] as u8;
+        count += self.cells[w].is_burning() as u8;
 
         let e = self.get_index(row, east);
-        count += self.cells[e] as u8;
+        count += self.cells[e].is_burning() as u8;
 
         let sw = self.get_index(south, west);
-        count += self.cells[sw] as u8;
+        count += self.cells[sw].is_burning() as u8;
 
         let s = self.get_index(south, column);
-        count += self.cells[s] as u8;
+        count += self.cells[s].is_burning() as u8;
 
         let se = self.get_index(south, east);
-        count += self.cells[se] as u8;
+        count += self.cells[se].is_burning() as u8;
 
         count
     }
@@ -152,8 +154,8 @@ impl Universe {
     fn new() -> Universe {
         utils::set_panic_hook();
 
-        let width = 128;
-        let height = 128;
+        let width = 100;
+        let height = 100;
         let num_focus = 3;
         let mut rng = rand::thread_rng();
         let mut pos = Vec::new();
@@ -173,6 +175,12 @@ impl Universe {
             })
             .collect();
 
+        let time_cells = (0..width * height)
+            .map(|_i| {
+                0
+            })
+            .collect();
+
         let game_configs = GameConfig {
             to_burn: 0.7,
             time_to_burn: 10,
@@ -183,7 +191,7 @@ impl Universe {
             width,
             height,
             cells,
-            time_cells: Vec::new(),
+            time_cells,
             game_configs,
         }
     }
@@ -204,11 +212,15 @@ pub fn start() -> Result<(), JsValue> {
         &context,
         WebGlRenderingContext::VERTEX_SHADER,
         r#"
-        attribute vec4 position;
+        attribute vec2 position;
         attribute float point_size;
+        attribute vec3 color;
+        varying vec3 u_color;
+
         void main() {
-            gl_Position = position;
+            gl_Position =  vec4(position, 0, 1);
             gl_PointSize = point_size;
+            u_color = color;
         }
     "#,
     )?;
@@ -216,79 +228,125 @@ pub fn start() -> Result<(), JsValue> {
         &context,
         WebGlRenderingContext::FRAGMENT_SHADER,
         r#"
+        precision mediump float;
+        varying vec3 u_color;
+
         void main() {
-            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            gl_FragColor = vec4(u_color, 1.0);
         }
     "#,
     )?;
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
 
-    let vertices: [f32; 9] = [-0.9, -0.9, 0.0, 0.7, -0.7, 0.0, 0.0, 0.7, 0.0];
-    let memory_buffer = wasm_bindgen::memory()
-        .dyn_into::<WebAssembly::Memory>()?
-        .buffer();
-    let vertices_location = vertices.as_ptr() as u32 / 4;
-    let vert_array = js_sys::Float32Array::new(&memory_buffer)
-        .subarray(vertices_location, vertices_location + vertices.len() as u32);
+    let width = 100;
+    let height = 100;
+    let size_square: f32 = 2.0 / (width as f32);
 
-    let buffer = context.create_buffer().ok_or("failed to create buffer")?;
-    context.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&buffer));
-    context.buffer_data_with_array_buffer_view(
-        WebGlRenderingContext::ARRAY_BUFFER,
-        &vert_array,
-        WebGlRenderingContext::STATIC_DRAW,
-    );
-    context.vertex_attrib_pointer_with_i32(0, 3, WebGlRenderingContext::FLOAT, false, 0, 0);
-    context.enable_vertex_attrib_array(0);
+    let mut table_points = Vec::new();
+
+    for col in 0..width {
+        for row in 0..height {
+            let x = (0.5 + col as f32) * size_square - 1.0;
+            let y = (0.5 + row as f32) * size_square - 1.0;
+
+            table_points.push(x);
+            table_points.push(y);
+        }
+    }
+
+    let vertices = table_points.as_slice();
+    context_array_bind(&context, &vertices, 0, 2)?;
+
+    let canvas_width = 600.0;
+    let canvas_height = 600.0;
+
+    let size = canvas_width / (width as f32);
+    let qtdd = width * height;
+    let sizes = vec![size;qtdd];
+    let sizes = sizes.as_slice();
+    context_array_bind(&context, &sizes, 1, 1)?;
 
     let _timer = Timer::new("animate");
 
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
-    *g.borrow_mut() = Some(Closure::wrap(Box::new(move |_dt| {
-        animate(&context.clone()).unwrap();
-        request_animation_frame(f.borrow().as_ref().unwrap());
-    }) as Box<FnMut(f32)> ));
+    let universe = Rc::new(RefCell::new(Universe::new()));
+    {
+        let u = universe.clone();
+        *g.borrow_mut() = Some(Closure::wrap(Box::new(move |_dt| {
+            u.borrow_mut().tick();
+            animate(&context.clone(), &u.borrow()).unwrap();
+            request_animation_frame(f.borrow().as_ref().unwrap());
+        }) as Box<FnMut(f32)>));
 
-    request_animation_frame(g.borrow().as_ref().unwrap());
+        request_animation_frame(g.borrow().as_ref().unwrap());
+    }
+
     Ok(())
 }
 
-fn animate(
-    context: &WebGlRenderingContext,
-) -> Result<(), JsValue> {
+fn animate(context: &WebGlRenderingContext, universe: &Universe) -> Result<(), JsValue> {
+    let qtdd = 10000;
+    let mut colors = Vec::new();
+    for i in 0..10000 {
+        if let Some(cell) = universe.cells.get(i){
+            let color: (f32, f32, f32) = match cell {
+                Cell::Alive => (0.0, 0.8, 0.0),
+                Cell::Burning => (0.8, 0.305882, 0.105882),
+                Cell::Dead => (0.0, 0.0, 0.0)
+            };
+            colors.push(color.0);
+            colors.push(color.1);
+            colors.push(color.2);
+        }
+    }
 
-    let mut rng = rand::thread_rng();
-    let size: f32 = rng.gen();
+    // let mut rng = rand::thread_rng();
+    // for i in 0..qtdd {
+    //     let r = rng.gen();
+    //     let g = rng.gen();
+    //     let b = rng.gen();
 
-    let sizes: [f32; 3] = [size * 10.0, size * 10.0, size * 10.0];
-    let memory_buffer = wasm_bindgen::memory()
-        .dyn_into::<WebAssembly::Memory>()?
-        .buffer();
-    let sizes_location = sizes.as_ptr() as u32 / 4;
-    let sizes_array = js_sys::Float32Array::new(&memory_buffer)
-        .subarray(sizes_location, sizes_location + sizes.len() as u32);
+    //     colors.push(r);
+    //     colors.push(g);
+    //     colors.push(b);
+    // }
 
-    let buffer = context.create_buffer().ok_or("failed to create buffer")?;
-    context.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&buffer));
-    context.buffer_data_with_array_buffer_view(
-        WebGlRenderingContext::ARRAY_BUFFER,
-        &sizes_array,
-        WebGlRenderingContext::STATIC_DRAW,
-    );
-    context.vertex_attrib_pointer_with_i32(1, 1, WebGlRenderingContext::FLOAT, false, 0, 0);
-    context.enable_vertex_attrib_array(1);
+    let colors = colors.as_slice();
+    context_array_bind(context, &colors, 2, 3)?;
 
-    context.clear_color(0.0, 0.5, 0.0, 1.0);
+    context.clear_color(0.0, 0.0, 0.0, 1.0);
     context.clear(WebGlRenderingContext::COLOR_BUFFER_BIT);
 
     context.draw_arrays(
         WebGlRenderingContext::POINTS,
         0,
-        3
+        qtdd
     );
+
+    Ok(())
+}
+
+fn context_array_bind(context: &WebGlRenderingContext, data: &[f32], index: u32, size: i32) -> Result<(), JsValue> {
+    let memory_buffer = wasm_bindgen::memory()
+        .dyn_into::<WebAssembly::Memory>()?
+        .buffer();
+    let data_location = data.as_ptr() as u32 / 4;
+    let data_array = js_sys::Float32Array::new(&memory_buffer)
+        .subarray(data_location, data_location + data.len() as u32);
+
+    let buffer = context.create_buffer().ok_or("failed to create buffer")?;
+    context.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, Some(&buffer));
+    context.buffer_data_with_array_buffer_view(
+        WebGlRenderingContext::ARRAY_BUFFER,
+        &data_array,
+        WebGlRenderingContext::STATIC_DRAW,
+    );
+    context.vertex_attrib_pointer_with_i32(index, size, WebGlRenderingContext::FLOAT, false, 0, 0);
+    context.enable_vertex_attrib_array(index);
+    context.bind_buffer(WebGlRenderingContext::ARRAY_BUFFER, None);
 
     Ok(())
 }

@@ -9,7 +9,8 @@ use web_sys::{WebGlRenderingContext};
 use rand::prelude::*;
 
 mod utils;
-use utils::{Timer, request_animation_frame, compile_shader, link_program};
+use utils::{Timer, request_animation_frame,
+            compile_shader, link_program, hello};
 
 #[wasm_bindgen]
 extern {
@@ -182,7 +183,7 @@ impl Universe {
             .collect();
 
         let game_configs = GameConfig {
-            to_burn: 0.7,
+            to_burn: 0.3,
             time_to_burn: 10,
             num_focus,
         };
@@ -196,6 +197,8 @@ impl Universe {
         }
     }
 }
+
+
 
 #[wasm_bindgen]
 pub fn start() -> Result<(), JsValue> {
@@ -272,14 +275,25 @@ pub fn start() -> Result<(), JsValue> {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
+    let fps = 1;
+    let mut then = utils::now();
+    let interval: f64 = 1000.0/fps as f64;
+
     let universe = Rc::new(RefCell::new(Universe::new()));
     {
         let u = universe.clone();
-        *g.borrow_mut() = Some(Closure::wrap(Box::new(move |_dt| {
-            u.borrow_mut().tick();
-            animate(&context.clone(), &u.borrow()).unwrap();
+        *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
             request_animation_frame(f.borrow().as_ref().unwrap());
-        }) as Box<FnMut(f32)>));
+
+            let now = utils::now();
+            let delta = now - then;
+            if delta > interval {
+                then = now - (delta % interval);
+
+                u.borrow_mut().tick();
+                animate(&context.clone(), &u.borrow()).unwrap();
+            }
+        }) as Box<FnMut()>));
 
         request_animation_frame(g.borrow().as_ref().unwrap());
     }

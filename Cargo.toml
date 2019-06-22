@@ -9,9 +9,12 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-wasm-bindgen = "0.2.46"
 js-sys = "0.3.23"
 cfg-if = "0.1.2"
+
+[dependencies.wasm-bindgen]
+version = "0.2.46"
+features = ["nightly"]
 
 [dependencies.rand]
 version = "0.6.5"

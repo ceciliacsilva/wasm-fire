@@ -10,7 +10,7 @@ use rand::prelude::*;
 
 mod utils;
 use utils::{Timer, request_animation_frame,
-            compile_shader, link_program, hello};
+            compile_shader, link_program};
 
 #[wasm_bindgen]
 extern {
@@ -36,6 +36,12 @@ impl Cell {
         };
     }
 
+    fn burn_to_dead(&mut self) {
+        if let Cell::Burning = *self {
+            *self = Cell::Dead
+        };
+    }
+
     fn is_burning(&self) -> u8 {
         match *self {
             Cell::Dead => 0,
@@ -51,7 +57,7 @@ struct Universe {
     height: u32,
     cells: Vec<Cell>,
     time_cells: Vec<u8>,
-    game_configs: GameConfig,
+    game_config: GameConfig,
 }
 
 #[derive(Clone)]
@@ -59,6 +65,31 @@ struct GameConfig {
     to_burn: f32,
     time_to_burn: u8,
     num_focus: u8,
+}
+
+struct RGB {
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+impl RGB {
+    fn new(r: u8, g: u8, b: u8) -> RGB {
+        RGB { r, g, b}
+    }
+
+    fn to_float(&self) -> (f32, f32, f32) {
+        let new_r = self.r as f32 / 255.0;
+        let new_g = self.g as f32 / 255.0;
+        let new_b = self.b as f32 / 255.0;
+
+        (new_r, new_g, new_b)
+    }
+
+    fn time_to_pos(time: u8, len: usize, game_config: &GameConfig) -> usize {
+        let pos = time as usize * len / game_config.time_to_burn as usize;
+        pos
+    }
 }
 
 impl Universe {
@@ -137,14 +168,19 @@ impl Universe {
                         let mut rng = rand::thread_rng();
                         let prob_burn: f32 = rng.gen();
 
-                        if prob_burn < self.game_configs.to_burn {
+                        if prob_burn < self.game_config.to_burn {
                             next[idx].live_to_burn();
                         }
                     }
                 }
 
                 if cell == Cell::Burning {
-                    self.time_cells[idx] += 1;
+                    if self.time_cells[idx] < self.game_config.time_to_burn {
+                        self.time_cells[idx] += 1;
+                    }
+                    else {
+                        next[idx].burn_to_dead();
+                    }
                 }
             }
         }
@@ -182,7 +218,7 @@ impl Universe {
             })
             .collect();
 
-        let game_configs = GameConfig {
+        let game_config = GameConfig {
             to_burn: 0.3,
             time_to_burn: 10,
             num_focus,
@@ -193,12 +229,10 @@ impl Universe {
             height,
             cells,
             time_cells,
-            game_configs,
+            game_config,
         }
     }
 }
-
-
 
 #[wasm_bindgen]
 pub fn start() -> Result<(), JsValue> {
@@ -275,7 +309,7 @@ pub fn start() -> Result<(), JsValue> {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
-    let fps = 1;
+    let fps = 5;
     let mut then = utils::now();
     let interval: f64 = 1000.0/fps as f64;
 
@@ -303,12 +337,23 @@ pub fn start() -> Result<(), JsValue> {
 
 fn animate(context: &WebGlRenderingContext, universe: &Universe) -> Result<(), JsValue> {
     let qtdd = 10000;
+
+    let fire_colors = vec![RGB::new(249, 199, 63), RGB::new(255, 224, 70),
+                           RGB::new(255, 78, 65), RGB::new(218, 51, 48),
+                           RGB::new(162, 18, 18),];
+
     let mut colors = Vec::new();
     for i in 0..10000 {
         if let Some(cell) = universe.cells.get(i){
             let color: (f32, f32, f32) = match cell {
                 Cell::Alive => (0.0, 0.8, 0.0),
-                Cell::Burning => (0.8, 0.305882, 0.105882),
+                Cell::Burning => {
+                    let pos = RGB::time_to_pos(universe.time_cells[i], fire_colors.len() - 1, &universe.game_config);
+                    match fire_colors.get(pos) {
+                        Some(color) => color.to_float(),
+                        None => (1.0, 1.0, 1.0),
+                    }
+                },
                 Cell::Dead => (0.0, 0.0, 0.0)
             };
             colors.push(color.0);
@@ -316,17 +361,6 @@ fn animate(context: &WebGlRenderingContext, universe: &Universe) -> Result<(), J
             colors.push(color.2);
         }
     }
-
-    // let mut rng = rand::thread_rng();
-    // for i in 0..qtdd {
-    //     let r = rng.gen();
-    //     let g = rng.gen();
-    //     let b = rng.gen();
-
-    //     colors.push(r);
-    //     colors.push(g);
-    //     colors.push(b);
-    // }
 
     let colors = colors.as_slice();
     context_array_bind(context, &colors, 2, 3)?;

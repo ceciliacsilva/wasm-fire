@@ -12,7 +12,6 @@ cfg_if!{
     }
 }
 
-
 pub struct Timer<'a> {
     name: &'a str,
 }
@@ -32,49 +31,6 @@ impl<'a> Drop for Timer<'a> {
 
 fn window() -> web_sys::Window {
     web_sys::window().expect("no global `window` exists")
-}
-
-#[wasm_bindgen]
-extern "C" {
-    fn setInterval(closure: &Closure<FnMut()>, millis: u32) -> f64;
-    fn cancelInterval(token: f64);
-
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-#[wasm_bindgen]
-pub struct Interval {
-    closure: Closure<FnMut()>,
-    token: f64,
-}
-
-impl Interval {
-    pub fn new<F: 'static>(millis: u32, f: F) -> Interval
-    where
-        F: FnMut()
-    {
-        // Construct a new closure.
-        let closure = Closure::new(f);
-
-        // Pass the closuer to JS, to run every n milliseconds.
-        let token = setInterval(&closure, millis);
-
-        Interval { closure, token }
-    }
-}
-
-// When the Interval is destroyed, cancel its `setInterval` timer.
-impl Drop for Interval {
-    fn drop(&mut self) {
-        cancelInterval(self.token);
-    }
-}
-
-// Keep logging "hello" every second until the resulting `Interval` is dropped.
-#[wasm_bindgen]
-pub fn hello() -> Interval {
-    Interval::new(1_000, || log("hello"))
 }
 
 pub fn request_animation_frame(f: &Closure<FnMut()>) {

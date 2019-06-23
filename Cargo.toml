@@ -33,6 +33,7 @@ version = "0.3.4"
 features = [
   'Document',
   'Element',
+  'HtmlElement',
   'HtmlCanvasElement',
   'WebGlBuffer',
   'WebGlRenderingContext',

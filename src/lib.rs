@@ -5,27 +5,18 @@ use js_sys::WebAssembly;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{WebGlRenderingContext};
+use web_sys::{Document, Element, HtmlElement, Window};
 
 mod utils;
 use utils::{Timer, request_animation_frame,
             compile_shader, link_program};
 
 mod cell;
-// mod js;
+mod js;
 mod game;
 
 use game::*;
 use cell::*;
-
-#[wasm_bindgen]
-extern {
-    pub fn alert(s: &str);
-}
-
-#[wasm_bindgen]
-pub fn say_hi(){
-    alert("Hello.");
-}
 
 #[wasm_bindgen]
 pub fn start() -> Result<(), JsValue> {
@@ -97,21 +88,40 @@ pub fn start() -> Result<(), JsValue> {
     let sizes = sizes.as_slice();
     context_array_bind(&context, &sizes, 1, 1)?;
 
+
+    let mut fps = Rc::new(RefCell::new(5));
+    {
+        let fps = fps.clone();
+        let a = Closure::wrap(Box::new(move || {
+            *fps.borrow_mut() += 20;
+            // js::log(&fps.to_string());
+        }) as Box<dyn FnMut()>);
+        document
+            .get_element_by_id("play-pause")
+            .expect("Should have a #play-pause button on the page")
+            .dyn_ref::<HtmlElement>()
+            .expect("#green-square be an `HtmlElement`")
+            .set_onclick(Some(a.as_ref().unchecked_ref()));
+        a.forget();
+    }
+    
+
     let _timer = Timer::new("animate");
 
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
-    let fps = 5;
     let mut then = utils::now();
-    let interval: f64 = 1000.0/fps as f64;
 
     let universe = Rc::new(RefCell::new(Universe::new()));
     {
         let u = universe.clone();
+        let fps = fps.clone();
         *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
             request_animation_frame(f.borrow().as_ref().unwrap());
 
+            let fps = *fps.borrow();
+            let interval: f64 = 1000.0/fps as f64;
             let now = utils::now();
             let delta = now - then;
             if delta > interval {

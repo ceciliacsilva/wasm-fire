@@ -11,11 +11,21 @@ use utils::{Timer, request_animation_frame,
             compile_shader, link_program};
 
 mod cell;
-mod js;
+// mod js;
 mod game;
 
 use game::*;
 use cell::*;
+
+#[wasm_bindgen]
+extern {
+    pub fn alert(s: &str);
+}
+
+#[wasm_bindgen]
+pub fn say_hi(){
+    alert("Hello.");
+}
 
 #[wasm_bindgen]
 pub fn start() -> Result<(), JsValue> {

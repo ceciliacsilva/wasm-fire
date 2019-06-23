@@ -1,3 +1,0 @@
-[submodule "/home/ceciliacsilva/prjs/wasm/wasm-webgl/www/"]
-	path = www
-	url = https://github.com/rustwasm/create-wasm-app.git

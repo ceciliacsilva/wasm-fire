@@ -139,12 +139,9 @@ impl Universe {
         self.cells = next;
     }
 
-    pub fn new() -> Universe {
+    pub fn new(width: u32, height: u32, num_focus: u8) -> Universe {
         crate::utils::set_panic_hook();
 
-        let width = 100;
-        let height = 100;
-        let num_focus = 3;
         let mut rng = rand::thread_rng();
         let mut pos = Vec::new();
 

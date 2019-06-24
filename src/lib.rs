@@ -1,11 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::convert::TryInto;
 
 use js_sys::WebAssembly;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{WebGlRenderingContext};
-use web_sys::{Document, Element, HtmlElement, Window};
+use web_sys::{HtmlElement, HtmlInputElement};
 
 mod utils;
 use utils::{Timer, request_animation_frame,
@@ -60,8 +61,9 @@ pub fn start() -> Result<(), JsValue> {
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
 
-    let width = 100;
-    let height = 100;
+    let width: u32 = 200;
+    let height: u32 = 200;
+    let num_focus = 4;
     let size_square: f32 = 2.0 / (width as f32);
 
     let mut table_points = Vec::new();
@@ -80,31 +82,27 @@ pub fn start() -> Result<(), JsValue> {
     context_array_bind(&context, &vertices, 0, 2)?;
 
     let canvas_width = 600.0;
-    let canvas_height = 600.0;
-
     let size = canvas_width / (width as f32);
-    let qtdd = width * height;
+    let qtdd = (width * height) as usize;
     let sizes = vec![size;qtdd];
     let sizes = sizes.as_slice();
     context_array_bind(&context, &sizes, 1, 1)?;
 
-
-    let mut fps = Rc::new(RefCell::new(5));
+    let fps = Rc::new(RefCell::new(new_fps_value().unwrap()));
     {
         let fps = fps.clone();
         let a = Closure::wrap(Box::new(move || {
-            *fps.borrow_mut() += 20;
+            *fps.borrow_mut() = new_fps_value().unwrap();
             // js::log(&fps.to_string());
         }) as Box<dyn FnMut()>);
         document
-            .get_element_by_id("play-pause")
-            .expect("Should have a #play-pause button on the page")
+            .get_element_by_id("fps-control")
+            .expect("Should have a #fps-control slider on the page")
             .dyn_ref::<HtmlElement>()
-            .expect("#green-square be an `HtmlElement`")
-            .set_onclick(Some(a.as_ref().unchecked_ref()));
+            .expect("#fps-control be an `HtmlElement`")
+            .set_onchange(Some(a.as_ref().unchecked_ref()));
         a.forget();
     }
-    
 
     let _timer = Timer::new("animate");
 
@@ -113,7 +111,7 @@ pub fn start() -> Result<(), JsValue> {
 
     let mut then = utils::now();
 
-    let universe = Rc::new(RefCell::new(Universe::new()));
+    let universe = Rc::new(RefCell::new(Universe::new(width, height, num_focus)));
     {
         let u = universe.clone();
         let fps = fps.clone();
@@ -138,15 +136,29 @@ pub fn start() -> Result<(), JsValue> {
     Ok(())
 }
 
+fn new_fps_value() -> Result<u32, JsValue> {
+    let document = web_sys::window().unwrap().document().unwrap();
+    let new_fps = document
+        .get_element_by_id("fps-control")
+        .expect("Should have a #fps-control slider on the page")
+        .dyn_ref::<HtmlInputElement>()
+        .expect("#fps-control be an `HtmlElement`")
+        .value()
+        .parse::<u32>()
+        .expect("Could not parse slider value");
+
+    Ok(new_fps)
+}
+
 fn animate(context: &WebGlRenderingContext, universe: &Universe) -> Result<(), JsValue> {
-    let qtdd = 10000;
+    let universe_size = universe.cells.len();
 
     let fire_colors = vec![RGB::new(249, 199, 63), RGB::new(255, 224, 70),
                            RGB::new(255, 78, 65), RGB::new(218, 51, 48),
                            RGB::new(162, 18, 18),];
 
     let mut colors = Vec::new();
-    for i in 0..10000 {
+    for i in 0..universe_size {
         if let Some(cell) = universe.cells.get(i){
             let color: (f32, f32, f32) = match cell {
                 Cell::Alive => (0.0, 0.8, 0.0),
@@ -174,7 +186,7 @@ fn animate(context: &WebGlRenderingContext, universe: &Universe) -> Result<(), J
     context.draw_arrays(
         WebGlRenderingContext::POINTS,
         0,
-        qtdd
+        universe_size.try_into().unwrap(),
     );
 
     Ok(())

@@ -19,6 +19,11 @@ mod game;
 use game::*;
 use cell::*;
 
+const WIDTH: u32 = 200;
+const HEIGHT: u32 = 200;
+const NUM_FOCUS: u8 = 4;
+
+
 #[wasm_bindgen]
 pub fn start() -> Result<(), JsValue> {
     let document = web_sys::window().unwrap().document().unwrap();
@@ -61,15 +66,12 @@ pub fn start() -> Result<(), JsValue> {
     let program = link_program(&context, &vert_shader, &frag_shader)?;
     context.use_program(Some(&program));
 
-    let width: u32 = 200;
-    let height: u32 = 200;
-    let num_focus = 4;
-    let size_square: f32 = 2.0 / (width as f32);
+    let size_square: f32 = 2.0 / (WIDTH as f32);
 
     let mut table_points = Vec::new();
 
-    for col in 0..width {
-        for row in 0..height {
+    for col in 0..WIDTH {
+        for row in 0..HEIGHT {
             let x = (0.5 + col as f32) * size_square - 1.0;
             let y = (0.5 + row as f32) * size_square - 1.0;
 
@@ -82,8 +84,8 @@ pub fn start() -> Result<(), JsValue> {
     context_array_bind(&context, &vertices, 0, 2)?;
 
     let canvas_width = 600.0;
-    let size = canvas_width / (width as f32);
-    let qtdd = (width * height) as usize;
+    let size = canvas_width / (WIDTH as f32);
+    let qtdd = (WIDTH * HEIGHT) as usize;
     let sizes = vec![size;qtdd];
     let sizes = sizes.as_slice();
     context_array_bind(&context, &sizes, 1, 1)?;
@@ -105,19 +107,16 @@ pub fn start() -> Result<(), JsValue> {
     }
 
     let _timer = Timer::new("animate");
-
-    let f = Rc::new(RefCell::new(None));
-    let g = f.clone();
-
     let mut then = utils::now();
 
-    let universe = Rc::new(RefCell::new(Universe::new(width, height, num_focus)));
+    let universe = Rc::new(RefCell::new(Universe::new(WIDTH, HEIGHT, NUM_FOCUS)));
     {
-        let u = universe.clone();
+        let f = Rc::new(RefCell::new(None));
+        let g = f.clone();
+
+        let universe = universe.clone();
         let fps = fps.clone();
         *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-            request_animation_frame(f.borrow().as_ref().unwrap());
-
             let fps = *fps.borrow();
             let interval: f64 = 1000.0/fps as f64;
             let now = utils::now();
@@ -125,9 +124,16 @@ pub fn start() -> Result<(), JsValue> {
             if delta > interval {
                 then = now - (delta % interval);
 
-                u.borrow_mut().tick();
-                animate(&context.clone(), &u.borrow()).unwrap();
+                let is_over = universe.borrow_mut().tick();
+                if is_over {
+                    js::pause();
+                    let _ = f.borrow_mut().take();
+                    return;
+                }
+                draw_universe(&context.clone(), &universe.borrow()).unwrap();
             }
+
+            request_animation_frame(f.borrow().as_ref().unwrap());
         }) as Box<FnMut()>));
 
         request_animation_frame(g.borrow().as_ref().unwrap());
@@ -150,7 +156,7 @@ fn new_fps_value() -> Result<u32, JsValue> {
     Ok(new_fps)
 }
 
-fn animate(context: &WebGlRenderingContext, universe: &Universe) -> Result<(), JsValue> {
+fn draw_universe(context: &WebGlRenderingContext, universe: &Universe) -> Result<(), JsValue> {
     let universe_size = universe.cells.len();
 
     let fire_colors = vec![RGB::new(249, 199, 63), RGB::new(255, 224, 70),

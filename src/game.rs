@@ -104,7 +104,7 @@ impl Universe {
 }
 
 impl Universe {
-    pub fn tick (&mut self) {
+    pub fn tick (&mut self) -> bool {
         let mut next = self.cells.clone();
 
         for row in 0..self.height {
@@ -136,7 +136,12 @@ impl Universe {
             }
         }
 
+        if self.cells == next {
+            return true;
+        }
+
         self.cells = next;
+        false
     }
 
     pub fn new(width: u32, height: u32, num_focus: u8) -> Universe {

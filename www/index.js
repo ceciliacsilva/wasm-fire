@@ -5,12 +5,13 @@ import * as wasm from "wasm-webgl";
 const playPauseButton = document.getElementById("play-pause");
 
 const play = () => {
-    playPauseButton.textContent = "⏸";
-    wasm.start();
+    playPauseButton.textContent = "▶";
+    // wasm.start();
 };
 
-const pause = () => {
-    playPauseButton.textContent = "▶";
-};
+playPauseButton.addEventListener("click", event => {
+    playPauseButton.textContent = " ↺ ";
+    wasm.start();
+});
 
 play();

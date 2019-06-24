@@ -15,3 +15,8 @@ extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     pub fn log(s: &str);
 }
+
+#[wasm_bindgen(module = "/defined-in-js.js")]
+extern "C" {
+    pub fn pause();
+}

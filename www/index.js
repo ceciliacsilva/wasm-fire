@@ -10,7 +10,7 @@ const play = () => {
 };
 
 playPauseButton.addEventListener("click", event => {
-    playPauseButton.textContent = " ↺ ";
+    playPauseButton.disabled = true;
     wasm.start();
 });
 

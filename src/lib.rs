@@ -21,8 +21,11 @@ use cell::*;
 
 const WIDTH: u32 = 200;
 const HEIGHT: u32 = 200;
-const NUM_FOCUS: u8 = 4;
-
+const GAME_CONFIG: GameConfig = GameConfig {
+    num_focus: 3,
+    to_burn: 0.3,
+    time_to_burn: 10,
+};
 
 #[wasm_bindgen]
 pub fn start() -> Result<(), JsValue> {
@@ -67,7 +70,6 @@ pub fn start() -> Result<(), JsValue> {
     context.use_program(Some(&program));
 
     let size_square: f32 = 2.0 / (WIDTH as f32);
-
     let mut table_points = Vec::new();
 
     for col in 0..WIDTH {
@@ -109,7 +111,7 @@ pub fn start() -> Result<(), JsValue> {
     let _timer = Timer::new("animate");
     let mut then = utils::now();
 
-    let universe = Rc::new(RefCell::new(Universe::new(WIDTH, HEIGHT, NUM_FOCUS)));
+    let universe = Rc::new(RefCell::new(Universe::new(WIDTH, HEIGHT, GAME_CONFIG)));
     {
         let f = Rc::new(RefCell::new(None));
         let g = f.clone();

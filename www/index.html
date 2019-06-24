@@ -5,30 +5,98 @@
         <title>CG</title>
         <style>
          .column {
-             float: left;
-             width: 50%;
+             /* float: left; */
+             padding: 45px;
          }
 
          /* Clear floats after the columns */
          .row:after {
-             content: "";
-             display: table;
-             clear: both;
+             /* content: ""; */
+             /* display: table; */
+             /* clear: both; */
+         }
+
+         .left {
+             width: 10%;
+         }
+
+         .right {
+             width: 75%;
+         }
+
+         .slidecontainer {
+             width: 100%;
+         }
+
+         .slider {
+             -webkit-appearance: none;
+             width: 100%;
+             height: 15px;
+             border-radius: 5px;
+             background: #d3d3d3;
+             outline: none;
+             opacity: 0.7;
+             -webkit-transition: .2s;
+             transition: opacity .2s;
+         }
+
+         .slider:hover {
+             opacity: 1;
+         }
+
+         .slider::-webkit-slider-thumb {
+             -webkit-appearance: none;
+             appearance: none;
+             width: 25px;
+             height: 25px;
+             border-radius: 50%;
+             background: #4CAF50;
+             cursor: pointer;
+         }
+
+         .slider::-moz-range-thumb {
+             width: 25px;
+             height: 25px;
+             border-radius: 50%;
+             background: #4CAF50;
+             cursor: pointer;
+         }
+
+         .center {
+             margin: auto;
+             width: 60%;
+             border: 3px solid #73AD21;
+             padding: 10px;
          }
         </style>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"> 
     </head>
     <body>
         <script src="./bootstrap.js"></script>
-        <h2>Trabalho Final de Computação Gráfica.</h2>
-        <button id="play-pause"></button>
-        <div class="row">
-            <div class="column">
-                <canvas id="canvas" width="1200" height="800"/>
-            </div>
-            <div class="colums">
-                <input id="fps-control" type="range" min="1" max="30>"
+        <div class="center">
+            <h2 class="text-center">
+                Rust + Wasm + WebGl = 🤓🥰
+                <small class="text-muted">- Trabalho Final Computação Gráfica.</small>
+            </h2>
+
+            <!-- <h3> -->
+            <!-- Fancy display heading -->
+            <!-- <small class="text-muted">With faded secondary text</small> -->
+            <!-- </h3> -->
+            <div class="row">
+                <div class="column left">
+                    <button id="play-pause" class="btn btn-dark btn-lg"></button>
+                </div>
+                <div class="column right">
+                    <div class="slidecontainer">
+                        <input id="fps-control" class="slider" type="range" min="1" max="30>"
+                    </div>
+                </div>
             </div>
         </div>
+        <canvas id="canvas" width="1100" height="650"></canvas>
+
+        <p class="lead">Cecília Carneiro e Silva - 11722EEL015.  Prof: Alexandre Cardoso.</p>
     </body>
 </html>
 

@@ -13,9 +13,9 @@ pub struct Universe {
 
 #[derive(Clone)]
 pub struct GameConfig {
-    to_burn: f32,
-    time_to_burn: u8,
-    num_focus: u8,
+    pub to_burn: f32,
+    pub time_to_burn: u8,
+    pub num_focus: u8,
 }
 
 pub struct RGB {
@@ -136,7 +136,7 @@ impl Universe {
             }
         }
 
-        if self.cells == next {
+        if !self.cells.contains(&Cell::Burning) {
             return true;
         }
 
@@ -144,13 +144,13 @@ impl Universe {
         false
     }
 
-    pub fn new(width: u32, height: u32, num_focus: u8) -> Universe {
+    pub fn new(width: u32, height: u32, game_config: GameConfig) -> Universe {
         crate::utils::set_panic_hook();
 
         let mut rng = rand::thread_rng();
         let mut pos = Vec::new();
 
-        for _i in 0..num_focus {
+        for _i in 0..game_config.num_focus {
             let n: u32 = rng.gen_range(0, width * height);
             pos.push(n);
         }
@@ -171,11 +171,7 @@ impl Universe {
             })
             .collect();
 
-        let game_config = GameConfig {
-            to_burn: 0.3,
-            time_to_burn: 10,
-            num_focus,
-        };
+        let game_config = game_config;
 
         Universe {
             width,

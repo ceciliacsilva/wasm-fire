@@ -1,4 +1,4 @@
-# Wasm + Rust + WebGl = = 🤓🥰
+# Wasm + Rust + WebGl = 🤓🥰
 
 Trabalho Final de Computação Gráfica. COPEL - FEELT.
 
@@ -12,4 +12,6 @@ Trabalho Final de Computação Gráfica. COPEL - FEELT.
 ```
 
 Goto to Browser ```http://localhost:8080/```.
+
+* Projeto de duas semanas… Possui algumas dívidas técnicas.
 

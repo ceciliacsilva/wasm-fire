@@ -13,5 +13,5 @@ Trabalho Final de Computação Gráfica. COPEL - FEELT.
 
 Goto to Browser ```http://localhost:8080/```.
 
-* Projeto de duas semanas… Possui algumas dívidas técnicas.
+    Ps: Projeto de duas semanas… Possui algumas dívidas técnicas.
 
